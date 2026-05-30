@@ -417,3 +417,45 @@ async def set_command_mastery(
         (level, day.isoformat(), dog_id, cmd),
     )
     await db.commit()
+
+
+# ── M4: Здоровье (Sprint 5) ───────────────────────────────────
+async def last_health(db: aiosqlite.Connection, dog_id: int, kind: str) -> dt.date | None:
+    """Дата последней процедуры данного типа (kind в payload, type='health')."""
+    cur = await db.execute(
+        """SELECT local_date, payload_json FROM event_log
+           WHERE dog_id = ? AND type = 'health' AND local_date IS NOT NULL
+           ORDER BY local_date DESC LIMIT 300""",
+        (dog_id,),
+    )
+    for row in await cur.fetchall():
+        try:
+            if json.loads(row["payload_json"] or "{}").get("kind") == kind:
+                return dt.date.fromisoformat(row["local_date"])
+        except (ValueError, TypeError):
+            continue
+    return None
+
+
+async def log_weight(
+    db: aiosqlite.Connection, dog_id: int, value: float, day: dt.date
+) -> None:
+    await db.execute(
+        "INSERT INTO health_metric (dog_id, metric, value, unit, measured_at) "
+        "VALUES (?, 'weight', ?, 'kg', ?)",
+        (dog_id, value, day.isoformat()),
+    )
+    await db.commit()
+
+
+async def weight_series(
+    db: aiosqlite.Connection, dog_id: int, limit: int = 30
+) -> list[tuple[str, float]]:
+    """Последние N замеров веса по возрастанию даты: [(measured_at, value), ...]."""
+    cur = await db.execute(
+        "SELECT value, measured_at FROM health_metric "
+        "WHERE dog_id = ? AND metric = 'weight' ORDER BY measured_at DESC LIMIT ?",
+        (dog_id, limit),
+    )
+    rows = await cur.fetchall()
+    return [(r["measured_at"], r["value"]) for r in reversed(rows)]

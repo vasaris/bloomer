@@ -13,6 +13,7 @@ from . import db, gamification as gam, keyboards, texts
 from .config import Settings
 from .modules import m0_adaptation as m0
 from .modules import m3_grooming as m3
+from .modules import m4_health as m4
 from .modules import m5_training as m5
 
 
@@ -37,6 +38,10 @@ async def _morning_brief(conn, today: dt.date) -> tuple[str, InlineKeyboardMarku
         xp = await db.get_xp(conn, dog["id"])
         game_title, _ = m5.game_of_day(today, xp)
         lines.append(f"• 👃 Нюхо-игра дня: <b>{game_title}</b> (/nose).")
+        due = await m4.due_codes(conn, dog["id"], today)
+        if due:
+            labels = ", ".join(m4.HEALTH[c][1] for c in due)
+            lines.append(f"• 🩺 По здоровью пора: {labels} (/health).")
     lines.append("• 🎯 Тренинг: отзыв — приоритет (/train).")
     if in_window:
         lines.append("• Вечером — астма-чек Макса.")
@@ -127,6 +132,16 @@ async def build_push(
             xp = await db.get_xp(conn, dog["id"])
             title, desc = m5.game_of_day(today, xp)
             return m5.nose_game_text(title, desc), keyboards.nose_kb()
+        if code == "health_check":
+            dog = await db.get_dog(conn)
+            due = await m4.due_codes(conn, dog["id"], today)
+            if not due:
+                return None  # ничего не пора — не шумим
+            lines = ["🩺 <b>Здоровье — сегодня по графику</b>"]
+            for c in due:
+                emoji, label, _, note = m4.HEALTH[c]
+                lines.append(f"{emoji} {label} — {note}")
+            return "\n".join(lines), keyboards.health_kb()
     finally:
         await conn.close()
 

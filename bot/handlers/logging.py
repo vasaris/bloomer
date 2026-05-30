@@ -32,6 +32,8 @@ async def on_walk(cb: CallbackQuery, settings) -> None:
     extra = await logbook.log_and_reward(settings, cb.from_user.id, "M2", "walk", {"place": place})
     await cb.message.edit_text(texts.WALK_LOGGED.get(place, "🚶 Прогулка записана."))
     await cb.answer("Записал 🐾")
+    if place in ("danube", "park"):
+        extra = list(extra) + [texts.TICK_AFTER_WALK]
     for msg in extra:
         await cb.message.answer(msg)
 

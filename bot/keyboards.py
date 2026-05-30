@@ -113,3 +113,21 @@ def truffle_kb(active_stage: int | None) -> InlineKeyboardMarkup | None:
             )],
         ]
     )
+
+
+# ── M4: Здоровье (Sprint 5) ────────────────────────────────────
+def health_kb() -> InlineKeyboardMarkup:
+    """Кнопки отметки процедур здоровья. Коды совпадают с m4_health.HEALTH."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="🩺 Осмотр", callback_data="health:vet"),
+                InlineKeyboardButton(text="💉 Прививка", callback_data="health:vaccine"),
+            ],
+            [
+                InlineKeyboardButton(text="💉 Бешенство", callback_data="health:rabies"),
+                InlineKeyboardButton(text="🕷 Клещи", callback_data="health:tick"),
+            ],
+            [InlineKeyboardButton(text="🪱 Глистогон", callback_data="health:deworm")],
+        ]
+    )

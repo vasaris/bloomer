@@ -19,7 +19,8 @@ _DEFAULT_PUSHES: dict[str, str] = {
     "morning_brief": "07:30",   # план дня
     "walk_morning": "08:00",    # утренняя прогулка (+ кнопки лога)
     "feed_morning": "08:30",    # кормёжка ×2 (Sprint 1)
-    "nose_task": "13:00",       # нюхо-задача дня (наполнение — Sprint 4)
+    "health_check": "09:00",    # проверка здоровья (шлётся, если что-то пора)
+    "nose_task": "13:00",       # нюхо-задача дня
     "groom_check": "10:30",     # проверка цикла груминга (шлётся, если что-то пора)
     "feed_evening": "18:30",    # кормёжка ×2 (Sprint 1)
     "walk_evening": "19:00",    # вечерняя прогулка (+ кнопки лога)
@@ -32,6 +33,7 @@ _PUSH_ENV = {
     "morning_brief": "PUSH_MORNING_BRIEF",
     "walk_morning": "PUSH_WALK_MORNING",
     "feed_morning": "PUSH_FEED_MORNING",
+    "health_check": "PUSH_HEALTH_CHECK",
     "nose_task": "PUSH_NOSE_TASK",
     "groom_check": "PUSH_GROOM_CHECK",
     "feed_evening": "PUSH_FEED_EVENING",
