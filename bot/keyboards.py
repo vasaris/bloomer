@@ -45,5 +45,6 @@ def log_menu_kb() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [InlineKeyboardButton(text="🚶 Прогулка", callback_data="logmenu:walk")],
             [InlineKeyboardButton(text="🍽 Кормёжка", callback_data="feed:done")],
+            [InlineKeyboardButton(text="👃 Нюхо-игра / тренинг", callback_data="nose:done")],
         ]
     )

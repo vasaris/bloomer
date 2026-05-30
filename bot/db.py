@@ -32,6 +32,8 @@ async def init_db(db_path: str) -> None:
         await db.executescript(schema)
         # Sprint 1: дата приезда — точка отсчёта адаптации (3-3-3).
         await _ensure_column(db, "dog", "arrived_at", "TEXT")
+        # Sprint 2: помесячное пополнение заморозок стрика.
+        await _ensure_column(db, "streak", "freeze_month", "TEXT")
         await db.commit()
 
 
@@ -163,3 +165,128 @@ async def asthma_trend(db: aiosqlite.Connection, limit: int = 14) -> list[aiosql
     )
     rows = await cur.fetchall()
     return list(reversed(rows))  # по возрастанию даты
+
+
+# ── Геймификация: XP (Sprint 2) ───────────────────────────────
+async def add_xp(db: aiosqlite.Connection, dog_id: int, amount: int) -> tuple[int, int]:
+    """Начисляет XP собаке (shared, user_id IS NULL). Возвращает (было, стало)."""
+    cur = await db.execute(
+        "SELECT id, total FROM xp WHERE dog_id = ? AND user_id IS NULL", (dog_id,)
+    )
+    row = await cur.fetchone()
+    if row is None:
+        await db.execute(
+            "INSERT INTO xp (dog_id, user_id, total, level) VALUES (?, NULL, ?, 1)",
+            (dog_id, amount),
+        )
+        await db.commit()
+        return 0, amount
+    old = row["total"]
+    new = old + amount
+    await db.execute("UPDATE xp SET total = ? WHERE id = ?", (new, row["id"]))
+    await db.commit()
+    return old, new
+
+
+async def get_xp(db: aiosqlite.Connection, dog_id: int) -> int:
+    cur = await db.execute(
+        "SELECT total FROM xp WHERE dog_id = ? AND user_id IS NULL", (dog_id,)
+    )
+    row = await cur.fetchone()
+    return row["total"] if row else 0
+
+
+# ── Геймификация: стрики (Sprint 2) ───────────────────────────
+async def register_streak_day(
+    db: aiosqlite.Connection, dog_id: int, kind: str, day: dt.date, freezes: int = 2
+) -> int:
+    """Засчитывает день для стрика. Возвращает текущее значение стрика.
+
+    Логика заморозок: на новый календарный месяц freezes_left пополняется до
+    `freezes`. Пропуски покрываются заморозками, если их хватает; иначе стрик
+    сбрасывается на 1.
+    """
+    cur = await db.execute(
+        "SELECT * FROM streak WHERE dog_id = ? AND kind = ?", (dog_id, kind)
+    )
+    row = await cur.fetchone()
+    month = day.strftime("%Y-%m")
+
+    if row is None:
+        await db.execute(
+            """INSERT INTO streak (dog_id, kind, current, best, last_day,
+                                   freezes_left, freeze_month)
+               VALUES (?, ?, 1, 1, ?, ?, ?)""",
+            (dog_id, kind, day.isoformat(), freezes, month),
+        )
+        await db.commit()
+        return 1
+
+    last = dt.date.fromisoformat(row["last_day"]) if row["last_day"] else None
+    freezes_left = row["freezes_left"]
+    if row["freeze_month"] != month:        # новый месяц — пополнить заморозки
+        freezes_left = freezes
+
+    if last == day:                          # уже засчитан сегодня
+        # всё равно зафиксируем возможное пополнение заморозок
+        await db.execute(
+            "UPDATE streak SET freezes_left = ?, freeze_month = ? WHERE id = ?",
+            (freezes_left, month, row["id"]),
+        )
+        await db.commit()
+        return row["current"]
+
+    if last is None:
+        current = 1
+    else:
+        gap = (day - last).days
+        if gap == 1:
+            current = row["current"] + 1
+        else:
+            missed = gap - 1
+            if freezes_left >= missed:
+                freezes_left -= missed
+                current = row["current"] + 1
+            else:
+                current = 1
+
+    best = max(row["best"], current)
+    await db.execute(
+        """UPDATE streak SET current = ?, best = ?, last_day = ?,
+                             freezes_left = ?, freeze_month = ? WHERE id = ?""",
+        (current, best, day.isoformat(), freezes_left, month, row["id"]),
+    )
+    await db.commit()
+    return current
+
+
+async def get_streak(db: aiosqlite.Connection, dog_id: int, kind: str) -> int:
+    cur = await db.execute(
+        "SELECT current FROM streak WHERE dog_id = ? AND kind = ?", (dog_id, kind)
+    )
+    row = await cur.fetchone()
+    return row["current"] if row else 0
+
+
+# ── Геймификация: ачивки (Sprint 2) ───────────────────────────
+async def unlock_achievement(db: aiosqlite.Connection, dog_id: int, code: str) -> bool:
+    """Разблокирует ачивку. True — если разблокирована впервые."""
+    cur = await db.execute(
+        "SELECT 1 FROM achievement WHERE dog_id = ? AND code = ? AND user_id IS NULL LIMIT 1",
+        (dog_id, code),
+    )
+    if await cur.fetchone() is not None:
+        return False
+    await db.execute(
+        "INSERT INTO achievement (dog_id, user_id, code) VALUES (?, NULL, ?)",
+        (dog_id, code),
+    )
+    await db.commit()
+    return True
+
+
+async def list_achievements(db: aiosqlite.Connection, dog_id: int) -> list[str]:
+    cur = await db.execute(
+        "SELECT code FROM achievement WHERE dog_id = ? ORDER BY unlocked_at", (dog_id,)
+    )
+    return [r["code"] for r in await cur.fetchall()]

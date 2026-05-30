@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS streak (
     best         INTEGER NOT NULL DEFAULT 0,
     last_day     TEXT,
     freezes_left INTEGER NOT NULL DEFAULT 2,
+    freeze_month TEXT,                     -- 'YYYY-MM' — месяц последнего пополнения
     UNIQUE(dog_id, kind)
 );
 

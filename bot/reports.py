@@ -9,7 +9,7 @@ import datetime as dt
 
 from aiogram.types import InlineKeyboardMarkup
 
-from . import db, keyboards, texts
+from . import db, gamification as gam, keyboards, texts
 from .config import Settings
 from .modules import m0_adaptation as m0
 
@@ -38,22 +38,37 @@ async def _day_summary(conn, today: dt.date) -> tuple[str, InlineKeyboardMarkup 
     dog_id = dog["id"]
     walks = await db.count_events_today(conn, dog_id, "walk", today)
     feeds = await db.count_events_today(conn, dog_id, "feed", today)
+    noses = await db.count_events_today(conn, dog_id, "nose", today)
     asthma_done = await db.asthma_done_today(conn, today)
     arrived = await db.get_arrived(conn)
     n = m0.adaptation_day(arrived, today)
     in_window = n is not None and n <= m0.ADAPT_LEN
 
+    walk_streak = await db.get_streak(conn, dog_id, "walk")
+    nose_streak = await db.get_streak(conn, dog_id, "nose")
+    xp = await db.get_xp(conn, dog_id)
+
     lines = ["🌙 <b>Итог дня</b>"]
-    lines.append(f"🚶 Прогулок: {walks}")
+    lines.append(f"🚶 Прогулок: {walks}" + (" ✓" if walks >= gam.WALKS_PER_DAY else ""))
     lines.append(f"🍽 Кормёжек: {feeds}")
+    if noses:
+        lines.append(f"👃 Нюхо-тренинг: {noses}")
     if in_window:
         lines.append(f"🫁 Астма-чек: {'✓' if asthma_done else '— не отмечен'}")
-    # Стрики/XP — Sprint 2.
+    lines.append(
+        f"\n🔥 Стрики — 🚶 {walk_streak} · 👃 {nose_streak} | "
+        f"{gam.level_for(xp)}, {xp} XP"
+    )
 
-    # Персона C: эмоц. точка — голос Блумера в удачный день.
-    done_ok = walks >= 1 and feeds >= 1 and (asthma_done or not in_window)
+    # Ачивка «Дома» (день 21) — проверяем здесь, раз в день.
+    home_msgs = await gam.check_home_achievement(conn, dog_id, n)
+
+    # Персона C: голос Блумера в удачный день (норма прогулок + еда + астма).
+    done_ok = walks >= gam.WALKS_PER_DAY and feeds >= 1 and (asthma_done or not in_window)
     if done_ok:
         lines.append("\n" + texts.BLOOMER_VOICE["good_day"])
+    for m in home_msgs:
+        lines.append("\n" + m)
     return "\n".join(lines), None
 
 

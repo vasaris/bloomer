@@ -6,7 +6,7 @@ from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.types import Message
 
-from .. import db, reports, texts
+from .. import db, gamification, reports, texts
 from ..config import Settings
 from ..scheduler import PushService
 
@@ -68,3 +68,25 @@ async def cmd_today(message: Message, settings: Settings) -> None:
     if built:
         text, markup = built
         await message.answer(text, reply_markup=markup)
+
+
+@router.message(Command("stats"))
+async def cmd_stats(message: Message, settings: Settings) -> None:
+    """Прогресс: уровень, XP, стрики, число ачивок."""
+    conn = await db.connect(settings.db_path)
+    try:
+        dog = await db.get_dog(conn)
+        xp = await db.get_xp(conn, dog["id"])
+        walk = await db.get_streak(conn, dog["id"], "walk")
+        nose = await db.get_streak(conn, dog["id"], "nose")
+        ach = await db.list_achievements(conn, dog["id"])
+    finally:
+        await conn.close()
+
+    text = texts.STATS.format(
+        dog=dog["name"], level=gamification.level_for(xp), xp=xp,
+        walk=walk, nose=nose, ach_count=len(ach),
+    )
+    if ach:
+        text += "\n" + "\n".join("• " + gamification.ach_title(c) for c in ach)
+    await message.answer(text)
