@@ -5,9 +5,11 @@
 """
 from __future__ import annotations
 
+import datetime as dt
 import os
 from dataclasses import dataclass
 
+import pytz
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -73,6 +75,14 @@ class Settings:
         if start <= end:
             return start <= now < end
         return now >= start or now < end  # окно через полночь
+
+    def now(self) -> dt.datetime:
+        """Текущее время в часовом поясе пользователя (а не сервера/UTC)."""
+        return dt.datetime.now(pytz.timezone(self.timezone))
+
+    def today(self) -> dt.date:
+        """Локальная дата по TZ. Использовать ВЕЗДЕ вместо date.today()."""
+        return self.now().date()
 
 
 def load_settings() -> Settings:

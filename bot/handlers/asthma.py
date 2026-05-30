@@ -5,8 +5,6 @@
 """
 from __future__ import annotations
 
-import datetime as dt
-
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
@@ -21,7 +19,7 @@ async def on_asthma(cb: CallbackQuery, settings) -> None:
     status = cb.data.split(":", 1)[1]  # ok | mild | concern
     conn = await db.connect(settings.db_path)
     try:
-        await db.log_asthma(conn, dt.date.today(), status)
+        await db.log_asthma(conn, settings.today(), status)
     finally:
         await conn.close()
     await cb.message.edit_text(texts.ASTHMA_REPLY.get(status, "Записал."))

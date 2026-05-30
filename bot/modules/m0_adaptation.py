@@ -72,7 +72,7 @@ async def cmd_arrived(message: Message, settings) -> None:
     """/arrived [ГГГГ-ММ-ДД] — задать дату приезда (по умолчанию сегодня)."""
     parts = (message.text or "").split(maxsplit=1)
     try:
-        day = dt.date.fromisoformat(parts[1].strip()) if len(parts) > 1 else dt.date.today()
+        day = dt.date.fromisoformat(parts[1].strip()) if len(parts) > 1 else settings.today()
     except ValueError:
         await message.answer("Формат даты: /arrived 2026-06-01 (или без аргумента — сегодня).")
         return
@@ -81,10 +81,12 @@ async def cmd_arrived(message: Message, settings) -> None:
         await db.set_arrived(conn, day)
     finally:
         await conn.close()
-    await message.answer(
-        f"Дата приезда: {day.isoformat()}. Считаю день адаптации от неё. "
-        f"Сегодня — день {adaptation_day(day) or 1}."
-    )
+    n = adaptation_day(day, settings.today())
+    if n < 1:
+        tail = f"Приезд через {1 - n} дн. — адаптация стартует в этот день."
+    else:
+        tail = f"Сегодня — день {n}."
+    await message.answer(f"Дата приезда: {day.isoformat()}. Считаю день адаптации от неё. {tail}")
 
 
 @router.message(Command("adaptation"))
@@ -103,5 +105,11 @@ async def cmd_adaptation(message: Message, settings) -> None:
         )
         return
 
-    n = adaptation_day(arrived)
+    n = adaptation_day(arrived, settings.today())
+    if n < 1:
+        await message.answer(
+            f"Блумер ещё не приехал — старт через {1 - n} дн. "
+            f"(дата приезда {arrived.isoformat()})."
+        )
+        return
     await message.answer(f"День {n} из {ADAPT_LEN}\n\n{day_card(n)}")

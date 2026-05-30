@@ -6,8 +6,6 @@ event_log → начисление XP/стриков/ачивок (gamification)
 """
 from __future__ import annotations
 
-import datetime as dt
-
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
@@ -26,10 +24,11 @@ async def _dog_and_user(settings, chat_id: int):
 
 async def _log_and_reward(settings, chat_id, module, type_, payload=None):
     """Запись события + геймификация. Возвращает список праздничных сообщений."""
+    today = settings.today()
     conn, dog, uid = await _dog_and_user(settings, chat_id)
     try:
-        await db.log_event(conn, dog["id"], module, type_, user_id=uid, payload=payload)
-        return await gamification.on_event(conn, dog["id"], type_, dt.date.today())
+        await db.log_event(conn, dog["id"], module, type_, today, user_id=uid, payload=payload)
+        return await gamification.on_event(conn, dog["id"], type_, today)
     finally:
         await conn.close()
 
@@ -69,3 +68,13 @@ async def on_nose(cb: CallbackQuery, settings) -> None:
     await cb.answer("Записал 👃")
     for msg in extra:
         await cb.message.answer(msg)
+
+
+@router.callback_query(F.data.startswith("snooze:"))
+async def on_snooze(cb: CallbackQuery, push) -> None:
+    """Отложить пуш на час (повторно придёт с теми же кнопками)."""
+    what = cb.data.split(":", 1)[1]  # walk | feed
+    code = "walk_morning" if what == "walk" else "feed_morning"
+    await push.snooze(code, minutes=60)
+    await cb.message.edit_text("⏰ Отложил на час.")
+    await cb.answer()

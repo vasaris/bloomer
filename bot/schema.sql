@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS event_log (
     module       TEXT NOT NULL,
     type         TEXT NOT NULL,           -- walk | feed | nose | groom | health
     payload_json TEXT,                    -- {duration_min, place:'danube', kind:'sniff'}
+    local_date   TEXT,                    -- дата события по TZ пользователя (не UTC)
     created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_event_dog_created ON event_log(dog_id, created_at);

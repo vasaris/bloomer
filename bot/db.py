@@ -34,6 +34,12 @@ async def init_db(db_path: str) -> None:
         await _ensure_column(db, "dog", "arrived_at", "TEXT")
         # Sprint 2: помесячное пополнение заморозок стрика.
         await _ensure_column(db, "streak", "freeze_month", "TEXT")
+        # Аудит: локальная дата события (граница суток по TZ, не UTC).
+        await _ensure_column(db, "event_log", "local_date", "TEXT")
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_event_dog_localdate "
+            "ON event_log(dog_id, type, local_date)"
+        )
         await db.commit()
 
 
@@ -115,13 +121,15 @@ async def log_event(
     dog_id: int,
     module: str,
     type_: str,
+    on_date: dt.date,
     user_id: int | None = None,
     payload: dict | None = None,
 ) -> None:
     await db.execute(
-        """INSERT INTO event_log (dog_id, user_id, module, type, payload_json)
-           VALUES (?, ?, ?, ?, ?)""",
-        (dog_id, user_id, module, type_, json.dumps(payload or {}, ensure_ascii=False)),
+        """INSERT INTO event_log (dog_id, user_id, module, type, payload_json, local_date)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (dog_id, user_id, module, type_,
+         json.dumps(payload or {}, ensure_ascii=False), on_date.isoformat()),
     )
     await db.commit()
 
@@ -131,7 +139,7 @@ async def count_events_today(
 ) -> int:
     cur = await db.execute(
         """SELECT COUNT(*) AS n FROM event_log
-           WHERE dog_id = ? AND type = ? AND date(created_at) = ?""",
+           WHERE dog_id = ? AND type = ? AND local_date = ?""",
         (dog_id, type_, day.isoformat()),
     )
     row = await cur.fetchone()

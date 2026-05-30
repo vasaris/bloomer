@@ -17,7 +17,7 @@ from aiogram import Bot
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from . import db, reports, texts
+from . import db, reports
 from .config import Settings
 
 log = logging.getLogger(__name__)

@@ -51,8 +51,10 @@ async def main() -> None:
     dp["settings"] = settings
     dp["push"] = push
 
-    # 4. Доступ только whitelisted чатам.
-    dp.message.middleware(AccessMiddleware(settings.owner_chat_ids))
+    # 4. Доступ только whitelisted чатам (сообщения + тапы по кнопкам).
+    access = AccessMiddleware(settings.owner_chat_ids)
+    dp.message.middleware(access)
+    dp.callback_query.middleware(access)
 
     # 5. Роутеры.
     dp.include_router(build_root_router())

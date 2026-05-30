@@ -19,15 +19,18 @@ async def _morning_brief(conn, today: dt.date) -> tuple[str, InlineKeyboardMarku
     lines = ["☀️ <b>Утренний бриф</b>"]
 
     n = m0.adaptation_day(arrived, today)
+    in_window = n is not None and 1 <= n <= m0.ADAPT_LEN
     if n is None:
         lines.append("• Дата приезда не задана — отметь командой /arrived.")
-    elif n <= m0.ADAPT_LEN:
+    elif n < 1:
+        lines.append(f"• Блумер приезжает через {1 - n} дн. — адаптация ещё не началась.")
+    elif in_window:
         lines.append(f"• Адаптация, день {n}/{m0.ADAPT_LEN}: {m0.day_card(n)}")
     # после 21 дня адаптацию в бриф не тащим — фаза «дома»
 
     lines.append("• Прогулка утром и вечером (отметишь по кнопке на пуше).")
     lines.append("• Кормёжка по графику ×2.")
-    if n is not None and n <= m0.ADAPT_LEN:
+    if in_window:
         lines.append("• Вечером — астма-чек Макса.")
     # TODO Sprint 6: проверка жары (погодное API) перед утренней прогулкой.
     return "\n".join(lines), None
@@ -42,7 +45,7 @@ async def _day_summary(conn, today: dt.date) -> tuple[str, InlineKeyboardMarkup 
     asthma_done = await db.asthma_done_today(conn, today)
     arrived = await db.get_arrived(conn)
     n = m0.adaptation_day(arrived, today)
-    in_window = n is not None and n <= m0.ADAPT_LEN
+    in_window = n is not None and 1 <= n <= m0.ADAPT_LEN
 
     walk_streak = await db.get_streak(conn, dog_id, "walk")
     nose_streak = await db.get_streak(conn, dog_id, "nose")
@@ -76,7 +79,7 @@ async def build_push(
     code: str, settings: Settings, today: dt.date | None = None
 ) -> tuple[str, InlineKeyboardMarkup | None] | None:
     """Возвращает (text, keyboard) или None, если пуш сегодня пропускаем."""
-    today = today or dt.date.today()
+    today = today or settings.today()
     conn = await db.connect(settings.db_path)
     try:
         if code == "morning_brief":
@@ -86,8 +89,8 @@ async def build_push(
         if code == "asthma_check":
             arrived = await db.get_arrived(conn)
             n = m0.adaptation_day(arrived, today)
-            if n is None or n > m0.ADAPT_LEN:
-                return None  # вне окна 21 дня — не шлём
+            if n is None or n < 1 or n > m0.ADAPT_LEN:
+                return None  # до приезда или вне окна 21 дня — не шлём
             if await db.asthma_done_today(conn, today):
                 return None  # уже ответили сегодня
             return texts.NEUTRAL["asthma_check"], keyboards.asthma_kb()
