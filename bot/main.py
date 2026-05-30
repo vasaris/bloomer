@@ -10,6 +10,8 @@ import asyncio
 import logging
 
 from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
 
 from . import db, texts
 from .config import load_settings
@@ -36,7 +38,10 @@ async def main() -> None:
         await conn.close()
 
     # 2. Бот и диспетчер.
-    bot = Bot(token=settings.bot_token)
+    bot = Bot(
+        token=settings.bot_token,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
     dp = Dispatcher()
 
     # 3. Планировщик пушей (создаём до polling, передаём в хендлеры через DI).

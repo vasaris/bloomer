@@ -17,7 +17,7 @@ from aiogram import Bot
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from . import db, texts
+from . import db, reports, texts
 from .config import Settings
 
 log = logging.getLogger(__name__)
@@ -47,10 +47,15 @@ class PushService:
             log.info("Пуш '%s' пропущен — тихие часы (%02d:%02d)", code, now.hour, now.minute)
             return
 
-        text = texts.neutral(code)
+        built = await reports.build_push(code, self.settings, now.date())
+        if built is None:
+            log.info("Пуш '%s' пропущен — сегодня не нужен", code)
+            return
+        text, markup = built
+
         for chat_id in await self._recipients():
             try:
-                await self.bot.send_message(chat_id, text)
+                await self.bot.send_message(chat_id, text, reply_markup=markup)
             except Exception as e:  # сеть/блокировка — не роняем планировщик
                 log.warning("Не доставлен пуш '%s' в %s: %s", code, chat_id, e)
 

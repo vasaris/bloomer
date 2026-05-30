@@ -6,7 +6,7 @@ from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.types import Message
 
-from .. import db, texts
+from .. import db, reports, texts
 from ..config import Settings
 from ..scheduler import PushService
 
@@ -59,3 +59,12 @@ async def cmd_profile(message: Message, settings: Settings) -> None:
 async def cmd_ping(message: Message, push: PushService) -> None:
     """Принудительно отправить тестовый пуш (минуя тихие часы)."""
     await push.send("test", force=True)
+
+
+@router.message(Command("today"))
+async def cmd_today(message: Message, settings: Settings) -> None:
+    """Утренний бриф по запросу."""
+    built = await reports.build_push("morning_brief", settings)
+    if built:
+        text, markup = built
+        await message.answer(text, reply_markup=markup)
