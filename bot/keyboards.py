@@ -48,3 +48,19 @@ def log_menu_kb() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="👃 Нюхо-игра / тренинг", callback_data="nose:done")],
         ]
     )
+
+
+def groom_kb() -> InlineKeyboardMarkup:
+    """Кнопки отметки груминга (M3). Коды совпадают с m3_grooming.GROOM."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="🪮 Расчесали", callback_data="groom:brush"),
+                InlineKeyboardButton(text="👂 Уши", callback_data="groom:ears"),
+            ],
+            [
+                InlineKeyboardButton(text="🛁 Купание", callback_data="groom:bath"),
+                InlineKeyboardButton(text="✂️ Стрижка", callback_data="groom:haircut"),
+            ],
+        ]
+    )

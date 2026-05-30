@@ -12,6 +12,7 @@ from aiogram.types import InlineKeyboardMarkup
 from . import db, gamification as gam, keyboards, texts
 from .config import Settings
 from .modules import m0_adaptation as m0
+from .modules import m3_grooming as m3
 
 
 async def _morning_brief(conn, today: dt.date) -> tuple[str, InlineKeyboardMarkup | None]:
@@ -94,6 +95,16 @@ async def build_push(
             if await db.asthma_done_today(conn, today):
                 return None  # уже ответили сегодня
             return texts.NEUTRAL["asthma_check"], keyboards.asthma_kb()
+        if code == "groom_check":
+            dog = await db.get_dog(conn)
+            due = await m3.due_codes(conn, dog["id"], today)
+            if not due:
+                return None  # ничего не пора — не шумим
+            lines = ["🧼 <b>Груминг сегодня</b>"]
+            for c in due:
+                emoji, label, _, note = m3.GROOM[c]
+                lines.append(f"{emoji} {label} — {note}")
+            return "\n".join(lines), keyboards.groom_kb()
     finally:
         await conn.close()
 

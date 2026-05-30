@@ -298,3 +298,40 @@ async def list_achievements(db: aiosqlite.Connection, dog_id: int) -> list[str]:
         "SELECT code FROM achievement WHERE dog_id = ? ORDER BY unlocked_at", (dog_id,)
     )
     return [r["code"] for r in await cur.fetchall()]
+
+
+# ── Груминг (Sprint 3): последняя дата по типу из журнала ──────
+async def last_groom(db: aiosqlite.Connection, dog_id: int, kind: str) -> dt.date | None:
+    """Дата последнего груминга данного типа (kind в payload). None — если не было."""
+    cur = await db.execute(
+        """SELECT local_date, payload_json FROM event_log
+           WHERE dog_id = ? AND type = 'groom' AND local_date IS NOT NULL
+           ORDER BY local_date DESC LIMIT 200""",
+        (dog_id,),
+    )
+    for row in await cur.fetchall():
+        try:
+            if json.loads(row["payload_json"] or "{}").get("kind") == kind:
+                return dt.date.fromisoformat(row["local_date"])
+        except (ValueError, TypeError):
+            continue
+    return None
+
+
+# ── Прогулки (Sprint 3): разбивка за последние N дней ──────────
+async def walks_by_place(
+    db: aiosqlite.Connection, dog_id: int, since: dt.date
+) -> dict[str, int]:
+    cur = await db.execute(
+        """SELECT payload_json FROM event_log
+           WHERE dog_id = ? AND type = 'walk' AND local_date >= ?""",
+        (dog_id, since.isoformat()),
+    )
+    counts: dict[str, int] = {}
+    for row in await cur.fetchall():
+        try:
+            place = json.loads(row["payload_json"] or "{}").get("place", "—")
+        except (ValueError, TypeError):
+            place = "—"
+        counts[place] = counts.get(place, 0) + 1
+    return counts

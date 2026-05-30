@@ -1,5 +1,7 @@
-"""Базовые хендлеры Sprint 0: /start, /help, /profile, /ping."""
+"""Базовые хендлеры: /start, /help, /profile, /ping, /today, /stats, /walks."""
 from __future__ import annotations
+
+import datetime as dt
 
 from aiogram import Bot, Router
 from aiogram.enums import ParseMode
@@ -68,6 +70,27 @@ async def cmd_today(message: Message, settings: Settings) -> None:
     if built:
         text, markup = built
         await message.answer(text, reply_markup=markup)
+
+
+@router.message(Command("walks"))
+async def cmd_walks(message: Message, settings: Settings) -> None:
+    """Разбивка прогулок за последние 7 дней по местам."""
+    since = settings.today() - dt.timedelta(days=6)
+    conn = await db.connect(settings.db_path)
+    try:
+        dog = await db.get_dog(conn)
+        counts = await db.walks_by_place(conn, dog["id"], since)
+    finally:
+        await conn.close()
+    total = sum(counts.values())
+    if not total:
+        await message.answer("🚶 За последние 7 дней прогулок не отмечено.")
+        return
+    labels = {"danube": "🌊 Дунай", "park": "🌳 Парк", "yard": "🏘 Двор"}
+    rows = "\n".join(
+        f"{labels.get(p, p)}: {n}" for p, n in sorted(counts.items(), key=lambda x: -x[1])
+    )
+    await message.answer(f"🚶 <b>Прогулки за 7 дней</b> — всего {total}\n{rows}")
 
 
 @router.message(Command("stats"))
