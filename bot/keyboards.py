@@ -90,13 +90,14 @@ def command_detail_kb(code: str) -> InlineKeyboardMarkup:
 
 
 def nose_kb() -> InlineKeyboardMarkup:
-    """Нюхо-игра дня: отметить (общий nose:done) + другая игра."""
+    """Нюхо-игра дня: отметить (общий nose:done) + другая игра + AI-идея под Блумера."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(text="👃 Сделали", callback_data="nose:done"),
                 InlineKeyboardButton(text="🔁 Другая", callback_data="nose:shuffle"),
             ],
+            [InlineKeyboardButton(text="✨ Идея под Блумера", callback_data="nose:ai")],
         ]
     )
 

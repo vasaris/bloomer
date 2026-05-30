@@ -74,6 +74,7 @@ class Settings:
     longitude: float
 
     anthropic_api_key: str | None
+    claude_model: str
 
     def is_quiet(self, hour: int, minute: int) -> bool:
         now = hour * 60 + minute
@@ -117,4 +118,5 @@ def load_settings() -> Settings:
         latitude=float(os.getenv("LATITUDE", "45.2671")),    # Нови-Сад
         longitude=float(os.getenv("LONGITUDE", "19.8335")),
         anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
+        claude_model=os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6"),
     )

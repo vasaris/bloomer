@@ -1,4 +1,4 @@
-"""Сбор роутеров. Sprint 6: + M6 социализация, M7 путешествия."""
+"""Сбор роутеров. Sprint 7: + Claude API (/ask, свободный текст, AI нюхо-идея)."""
 from aiogram import Router
 
 from ..modules import (
@@ -9,7 +9,7 @@ from ..modules import (
     m6_socialization,
     m7_travel,
 )
-from . import asthma, common, logging
+from . import ask, asthma, common, logging
 
 
 def build_root_router() -> Router:
@@ -23,4 +23,6 @@ def build_root_router() -> Router:
     root.include_router(m7_travel.router)
     root.include_router(logging.router)
     root.include_router(asthma.router)
+    # ask — последним: свободный текст ловит всё, что не команда и не кнопка.
+    root.include_router(ask.router)
     return root
