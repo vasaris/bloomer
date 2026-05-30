@@ -135,3 +135,28 @@ CREATE TABLE IF NOT EXISTS command_progress (
     updated_at TEXT,
     UNIQUE(dog_id, cmd)
 );
+
+-- ── M6: прогресс социализации (Sprint 6) ──
+-- Зеркало command_progress: уровень привыкания 0..3 по каждому «новому опыту»
+-- (машины, шум, лифт, собаки, люди, дети, поездка в машине). sessions — кэш отметок.
+CREATE TABLE IF NOT EXISTS soc_item (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    dog_id     INTEGER NOT NULL REFERENCES dog(id) ON DELETE CASCADE,
+    item       TEXT NOT NULL,           -- cars | noise | elevator | dogs | people | kids | car_ride
+    level      INTEGER NOT NULL DEFAULT 0,
+    sessions   INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT,
+    UNIQUE(dog_id, item)
+);
+
+-- ── M7: чек-лист подготовки к текущему туру (Sprint 6) ──
+-- Состояние «галочек» текущей подготовки. /trip пересобирает список, тап — toggle,
+-- «Выехали» логирует событие type='trip' в event_log и сбрасывает галочки.
+CREATE TABLE IF NOT EXISTS trip_checklist (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    dog_id     INTEGER NOT NULL REFERENCES dog(id) ON DELETE CASCADE,
+    item       TEXT NOT NULL,
+    checked    INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT,
+    UNIQUE(dog_id, item)
+);

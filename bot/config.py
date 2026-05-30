@@ -70,6 +70,9 @@ class Settings:
     quiet_start: tuple[int, int]
     quiet_end: tuple[int, int]
 
+    latitude: float
+    longitude: float
+
     anthropic_api_key: str | None
 
     def is_quiet(self, hour: int, minute: int) -> bool:
@@ -111,5 +114,7 @@ def load_settings() -> Settings:
         weekly_review_time=_parse_hm(os.getenv("PUSH_WEEKLY_REVIEW", _DEFAULT_WEEKLY[1])),
         quiet_start=_parse_hm(os.getenv("QUIET_HOURS_START", "22:00")),
         quiet_end=_parse_hm(os.getenv("QUIET_HOURS_END", "07:00")),
+        latitude=float(os.getenv("LATITUDE", "45.2671")),    # Нови-Сад
+        longitude=float(os.getenv("LONGITUDE", "19.8335")),
         anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
     )

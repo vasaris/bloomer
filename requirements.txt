@@ -3,6 +3,7 @@ APScheduler==3.10.4
 aiosqlite==0.20.0
 python-dotenv==1.0.1
 pytz==2024.2
+aiohttp==3.10.11   # прямое использование в bot/weather.py (идёт и транзитивно с aiogram)
 
 # Sprint 7 (Claude API) — раскомментировать, когда дойдём:
 # anthropic==0.39.0

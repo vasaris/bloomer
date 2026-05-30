@@ -131,3 +131,41 @@ def health_kb() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="🪱 Глистогон", callback_data="health:deworm")],
         ]
     )
+
+
+# ── M6: Социализация (Sprint 6) ────────────────────────────────
+def soc_board_kb(order: list[str], items: dict) -> InlineKeyboardMarkup:
+    """Доска опыта: по кнопке на каждый «новый опыт» (открывает деталь)."""
+    rows = []
+    for code in order:
+        emoji, label, _city = items[code]
+        rows.append([InlineKeyboardButton(
+            text=f"{emoji} {label}", callback_data=f"soc:{code}"
+        )])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def soc_detail_kb(code: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Отметить опыт сегодня", callback_data=f"soclog:{code}")],
+            [InlineKeyboardButton(text="⬆️ Стал увереннее", callback_data=f"socup:{code}")],
+            [InlineKeyboardButton(text="⬅️ К чек-листу", callback_data="soc:board")],
+        ]
+    )
+
+
+# ── M7: Путешествия (Sprint 6) ─────────────────────────────────
+def trip_kb(checklist: dict[str, bool], labels: dict[str, tuple[str, str]]) -> InlineKeyboardMarkup:
+    """Чек-лист подготовки к туру: тап по пункту = toggle. + сброс и «Поехали»."""
+    rows = []
+    for code, (emoji, label) in labels.items():
+        mark = "☑️" if checklist.get(code) else "▫️"
+        rows.append([InlineKeyboardButton(
+            text=f"{mark} {emoji} {label}", callback_data=f"trip:toggle:{code}"
+        )])
+    rows.append([
+        InlineKeyboardButton(text="🔄 Сбросить", callback_data="trip:reset"),
+        InlineKeyboardButton(text="🚗 Поехали (спокойно)", callback_data="trip:go"),
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=rows)

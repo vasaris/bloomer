@@ -9,25 +9,53 @@ import datetime as dt
 
 from aiogram.types import InlineKeyboardMarkup
 
-from . import db, gamification as gam, keyboards, texts
+from . import db, gamification as gam, keyboards, texts, weather
 from .config import Settings
 from .modules import m0_adaptation as m0
 from .modules import m3_grooming as m3
 from .modules import m4_health as m4
 from .modules import m5_training as m5
+from .modules import m6_socialization as m6
+
+# Пуши, которые молчат, пока Блумер не приехал (arrived ещё не наступил).
+# Утренний бриф намеренно НЕ здесь — он остаётся единственным голосом до приезда
+# (короткий, с отсчётом и подсказкой /arrived). «test» тоже не глушим — это /ping.
+_PRE_ARRIVAL_SILENT = frozenset({
+    "walk_morning", "walk_evening", "feed_morning", "feed_evening",
+    "nose_task", "groom_check", "health_check", "asthma_check",
+    "day_summary", "weekly_review",
+})
 
 
-async def _morning_brief(conn, today: dt.date) -> tuple[str, InlineKeyboardMarkup | None]:
+async def _morning_brief(conn, settings: Settings, today: dt.date) -> tuple[str, InlineKeyboardMarkup | None]:
     arrived = await db.get_arrived(conn)
+    n = m0.adaptation_day(arrived, today)
+
+    # До приезда Блумера — короткий бриф без распорядка (кормить/гулять некого).
+    # Остальные пуши в этот период подавлены (см. _PRE_ARRIVAL_SILENT).
+    if n is None:
+        return (
+            "☀️ <b>Утренний бриф</b>\n"
+            "• Блумер ещё не у нас. Отметь дату приезда — /arrived (в день приезда) "
+            "или /arrived ГГГГ-ММ-ДД. От неё включится весь распорядок и напоминания."
+        ), None
+    if n < 1:
+        return (
+            "☀️ <b>Утренний бриф</b>\n"
+            f"• До приезда Блумера {1 - n} дн. Пока готовим базу: место с тряпкой от Горана, "
+            f"миски, маршрут к Дунаю, HEPA в комнате Макса. Полный распорядок включится в день приезда."
+        ), None
+
     lines = ["☀️ <b>Утренний бриф</b>"]
 
-    n = m0.adaptation_day(arrived, today)
-    in_window = n is not None and 1 <= n <= m0.ADAPT_LEN
-    if n is None:
-        lines.append("• Дата приезда не задана — отметь командой /arrived.")
-    elif n < 1:
-        lines.append(f"• Блумер приезжает через {1 - n} дн. — адаптация ещё не началась.")
-    elif in_window:
+    # Проверка жары перед утренней прогулкой (Sprint 6). Молчим, когда прохладно.
+    w = await weather.fetch_weather(settings.latitude, settings.longitude)
+    advice = weather.heat_advice(w)
+    if advice is not None:
+        lines.append("• " + advice[1])
+
+    in_window = 1 <= n <= m0.ADAPT_LEN
+    if in_window:
         lines.append(f"• Адаптация, день {n}/{m0.ADAPT_LEN}: {m0.day_card(n)}")
     # после 21 дня адаптацию в бриф не тащим — фаза «дома»
 
@@ -43,9 +71,9 @@ async def _morning_brief(conn, today: dt.date) -> tuple[str, InlineKeyboardMarku
             labels = ", ".join(m4.HEALTH[c][1] for c in due)
             lines.append(f"• 🩺 По здоровью пора: {labels} (/health).")
     lines.append("• 🎯 Тренинг: отзыв — приоритет (/train).")
+    lines.append(f"• 🐕‍🦺 Социализация дня: {m6.soc_idea_of_day(today)} (/social).")
     if in_window:
         lines.append("• Вечером — астма-чек Макса.")
-    # TODO Sprint 6: проверка жары (погодное API) перед утренней прогулкой.
     return "\n".join(lines), None
 
 
@@ -105,8 +133,17 @@ async def build_push(
     today = today or settings.today()
     conn = await db.connect(settings.db_path)
     try:
+        # Пока Блумер не приехал — глушим все операционные пуши (кормёжка/прогулка/
+        # нюхо/груминг/здоровье/астма/итоги): собаки ещё нет, напоминания = шум.
+        # Говорит только утренний бриф (короткий, с обратным отсчётом до приезда).
+        arrived = await db.get_arrived(conn)
+        n = m0.adaptation_day(arrived, today)
+        arrived_yet = n is not None and n >= 1
+        if not arrived_yet and code in _PRE_ARRIVAL_SILENT:
+            return None
+
         if code == "morning_brief":
-            return await _morning_brief(conn, today)
+            return await _morning_brief(conn, settings, today)
         if code == "day_summary":
             return await _day_summary(conn, today)
         if code == "asthma_check":

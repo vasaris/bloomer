@@ -459,3 +459,94 @@ async def weight_series(
     )
     rows = await cur.fetchall()
     return [(r["measured_at"], r["value"]) for r in reversed(rows)]
+
+
+# ── Универсальный счётчик событий по типу (Sprint 6) ──────────
+async def count_events_type(db: aiosqlite.Connection, dog_id: int, type_: str) -> int:
+    """Всего событий данного типа за всё время (напр. сколько было выездов)."""
+    cur = await db.execute(
+        "SELECT COUNT(*) AS n FROM event_log WHERE dog_id = ? AND type = ?",
+        (dog_id, type_),
+    )
+    row = await cur.fetchone()
+    return row["n"] if row else 0
+
+
+# ── M6: Социализация (Sprint 6) — зеркало command_progress ─────
+async def ensure_soc_items(db: aiosqlite.Connection, dog_id: int, items: list[str]) -> None:
+    for it in items:
+        await db.execute(
+            "INSERT OR IGNORE INTO soc_item (dog_id, item, level, sessions) "
+            "VALUES (?, ?, 0, 0)",
+            (dog_id, it),
+        )
+    await db.commit()
+
+
+async def get_soc_progress(db: aiosqlite.Connection, dog_id: int) -> dict[str, aiosqlite.Row]:
+    cur = await db.execute(
+        "SELECT item, level, sessions FROM soc_item WHERE dog_id = ?", (dog_id,)
+    )
+    return {r["item"]: r for r in await cur.fetchall()}
+
+
+async def bump_soc_session(
+    db: aiosqlite.Connection, dog_id: int, item: str, day: dt.date
+) -> None:
+    await db.execute(
+        "UPDATE soc_item SET sessions = sessions + 1, updated_at = ? "
+        "WHERE dog_id = ? AND item = ?",
+        (day.isoformat(), dog_id, item),
+    )
+    await db.commit()
+
+
+async def set_soc_level(
+    db: aiosqlite.Connection, dog_id: int, item: str, level: int, day: dt.date
+) -> None:
+    await db.execute(
+        "UPDATE soc_item SET level = ?, updated_at = ? WHERE dog_id = ? AND item = ?",
+        (level, day.isoformat(), dog_id, item),
+    )
+    await db.commit()
+
+
+# ── M7: Чек-лист подготовки к туру (Sprint 6) ─────────────────
+async def ensure_trip_items(db: aiosqlite.Connection, dog_id: int, items: list[str]) -> None:
+    for it in items:
+        await db.execute(
+            "INSERT OR IGNORE INTO trip_checklist (dog_id, item, checked) VALUES (?, ?, 0)",
+            (dog_id, it),
+        )
+    await db.commit()
+
+
+async def get_trip_checklist(db: aiosqlite.Connection, dog_id: int) -> dict[str, bool]:
+    cur = await db.execute(
+        "SELECT item, checked FROM trip_checklist WHERE dog_id = ?", (dog_id,)
+    )
+    return {r["item"]: bool(r["checked"]) for r in await cur.fetchall()}
+
+
+async def toggle_trip_item(
+    db: aiosqlite.Connection, dog_id: int, item: str, day: dt.date
+) -> bool:
+    """Переключает галочку пункта. Возвращает новое состояние (True — отмечено)."""
+    cur = await db.execute(
+        "SELECT checked FROM trip_checklist WHERE dog_id = ? AND item = ?",
+        (dog_id, item),
+    )
+    row = await cur.fetchone()
+    new = 0 if (row and row["checked"]) else 1
+    await db.execute(
+        "INSERT INTO trip_checklist (dog_id, item, checked, updated_at) VALUES (?, ?, ?, ?) "
+        "ON CONFLICT(dog_id, item) DO UPDATE SET checked = ?, updated_at = ?",
+        (dog_id, item, new, day.isoformat(), new, day.isoformat()),
+    )
+    await db.commit()
+    return bool(new)
+
+
+async def reset_trip_checklist(db: aiosqlite.Connection, dog_id: int) -> None:
+    await db.execute("UPDATE trip_checklist SET checked = 0 WHERE dog_id = ?", (dog_id,))
+    await db.commit()
