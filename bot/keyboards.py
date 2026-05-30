@@ -64,3 +64,52 @@ def groom_kb() -> InlineKeyboardMarkup:
             ],
         ]
     )
+
+
+# ── M5: Тренинг (Sprint 4) ─────────────────────────────────────
+def train_board_kb(order: list[str], commands: dict) -> InlineKeyboardMarkup:
+    """Доска команд: по кнопке на команду (открывает деталь)."""
+    rows = []
+    for code in order:
+        emoji, label, priority = commands[code]
+        star = " ⭐" if priority else ""
+        rows.append([InlineKeyboardButton(
+            text=f"{emoji} {label}{star}", callback_data=f"cmd:{code}"
+        )])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def command_detail_kb(code: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Отработали сегодня", callback_data=f"cmdlog:{code}")],
+            [InlineKeyboardButton(text="⬆️ Освоил уровень", callback_data=f"cmdup:{code}")],
+            [InlineKeyboardButton(text="⬅️ К доске команд", callback_data="cmd:board")],
+        ]
+    )
+
+
+def nose_kb() -> InlineKeyboardMarkup:
+    """Нюхо-игра дня: отметить (общий nose:done) + другая игра."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="👃 Сделали", callback_data="nose:done"),
+                InlineKeyboardButton(text="🔁 Другая", callback_data="nose:shuffle"),
+            ],
+        ]
+    )
+
+
+def truffle_kb(active_stage: int | None) -> InlineKeyboardMarkup | None:
+    """Кнопка закрытия активного этапа трюфель-программы (если есть)."""
+    if active_stage is None:
+        return None
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(
+                text=f"✅ Закрыл этап {active_stage}",
+                callback_data=f"truffle:done:{active_stage}",
+            )],
+        ]
+    )

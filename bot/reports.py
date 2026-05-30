@@ -13,6 +13,7 @@ from . import db, gamification as gam, keyboards, texts
 from .config import Settings
 from .modules import m0_adaptation as m0
 from .modules import m3_grooming as m3
+from .modules import m5_training as m5
 
 
 async def _morning_brief(conn, today: dt.date) -> tuple[str, InlineKeyboardMarkup | None]:
@@ -31,6 +32,12 @@ async def _morning_brief(conn, today: dt.date) -> tuple[str, InlineKeyboardMarku
 
     lines.append("• Прогулка утром и вечером (отметишь по кнопке на пуше).")
     lines.append("• Кормёжка по графику ×2.")
+    dog = await db.get_dog(conn)
+    if dog is not None:
+        xp = await db.get_xp(conn, dog["id"])
+        game_title, _ = m5.game_of_day(today, xp)
+        lines.append(f"• 👃 Нюхо-игра дня: <b>{game_title}</b> (/nose).")
+    lines.append("• 🎯 Тренинг: отзыв — приоритет (/train).")
     if in_window:
         lines.append("• Вечером — астма-чек Макса.")
     # TODO Sprint 6: проверка жары (погодное API) перед утренней прогулкой.
@@ -43,6 +50,7 @@ async def _day_summary(conn, today: dt.date) -> tuple[str, InlineKeyboardMarkup 
     walks = await db.count_events_today(conn, dog_id, "walk", today)
     feeds = await db.count_events_today(conn, dog_id, "feed", today)
     noses = await db.count_events_today(conn, dog_id, "nose", today)
+    cmds = await db.count_events_today(conn, dog_id, "command", today)
     asthma_done = await db.asthma_done_today(conn, today)
     arrived = await db.get_arrived(conn)
     n = m0.adaptation_day(arrived, today)
@@ -50,6 +58,7 @@ async def _day_summary(conn, today: dt.date) -> tuple[str, InlineKeyboardMarkup 
 
     walk_streak = await db.get_streak(conn, dog_id, "walk")
     nose_streak = await db.get_streak(conn, dog_id, "nose")
+    cmd_streak = await db.get_streak(conn, dog_id, "command")
     xp = await db.get_xp(conn, dog_id)
 
     lines = ["🌙 <b>Итог дня</b>"]
@@ -57,10 +66,18 @@ async def _day_summary(conn, today: dt.date) -> tuple[str, InlineKeyboardMarkup 
     lines.append(f"🍽 Кормёжек: {feeds}")
     if noses:
         lines.append(f"👃 Нюхо-тренинг: {noses}")
+    if cmds:
+        lines.append(f"🧠 Тренировок команд: {cmds}")
     if in_window:
         lines.append(f"🫁 Астма-чек: {'✓' if asthma_done else '— не отмечен'}")
+
+    tstages = await db.get_truffle_stages(conn, dog_id)
+    active = m5.truffle_active(tstages) if tstages else None
+    if active is not None:
+        lines.append(f"🍄 Трюфель: этап {active}/{m5.TRUFFLE_LEN} — {m5.TRUFFLE_STAGES[active][0]}")
+
     lines.append(
-        f"\n🔥 Стрики — 🚶 {walk_streak} · 👃 {nose_streak} | "
+        f"\n🔥 Стрики — 🚶 {walk_streak} · 👃 {nose_streak} · 🧠 {cmd_streak} | "
         f"{gam.level_for(xp)}, {xp} XP"
     )
 
@@ -105,6 +122,11 @@ async def build_push(
                 emoji, label, _, note = m3.GROOM[c]
                 lines.append(f"{emoji} {label} — {note}")
             return "\n".join(lines), keyboards.groom_kb()
+        if code == "nose_task":
+            dog = await db.get_dog(conn)
+            xp = await db.get_xp(conn, dog["id"])
+            title, desc = m5.game_of_day(today, xp)
+            return m5.nose_game_text(title, desc), keyboards.nose_kb()
     finally:
         await conn.close()
 

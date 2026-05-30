@@ -102,13 +102,14 @@ async def cmd_stats(message: Message, settings: Settings) -> None:
         xp = await db.get_xp(conn, dog["id"])
         walk = await db.get_streak(conn, dog["id"], "walk")
         nose = await db.get_streak(conn, dog["id"], "nose")
+        cmd = await db.get_streak(conn, dog["id"], "command")
         ach = await db.list_achievements(conn, dog["id"])
     finally:
         await conn.close()
 
     text = texts.STATS.format(
         dog=dog["name"], level=gamification.level_for(xp), xp=xp,
-        walk=walk, nose=nose, ach_count=len(ach),
+        walk=walk, nose=nose, cmd=cmd, ach_count=len(ach),
     )
     if ach:
         text += "\n" + "\n".join("• " + gamification.ach_title(c) for c in ach)

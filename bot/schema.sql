@@ -123,3 +123,15 @@ CREATE TABLE IF NOT EXISTS snooze (
     fired      INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- ── M5: мини-прогресс по командам (Sprint 4) ──
+-- mastery 0..5 (реальная надёжность — выставляет человек), sessions — кэш числа тренировок.
+CREATE TABLE IF NOT EXISTS command_progress (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    dog_id     INTEGER NOT NULL REFERENCES dog(id) ON DELETE CASCADE,
+    cmd        TEXT NOT NULL,            -- name | come | recall | place | leave
+    mastery    INTEGER NOT NULL DEFAULT 0,
+    sessions   INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT,
+    UNIQUE(dog_id, cmd)
+);

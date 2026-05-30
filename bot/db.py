@@ -335,3 +335,85 @@ async def walks_by_place(
             place = "—"
         counts[place] = counts.get(place, 0) + 1
     return counts
+
+
+# ── M5: Трюфель-программа по этапам (Sprint 4) ─────────────────
+async def ensure_truffle(db: aiosqlite.Connection, dog_id: int, n_stages: int) -> None:
+    """Инициализирует этапы при первом обращении: этап 1 — active, остальные — locked."""
+    cur = await db.execute(
+        "SELECT COUNT(*) AS n FROM truffle_stage WHERE dog_id = ?", (dog_id,)
+    )
+    if (await cur.fetchone())["n"]:
+        return
+    today = dt.date.today().isoformat()
+    for s in range(1, n_stages + 1):
+        await db.execute(
+            "INSERT INTO truffle_stage (dog_id, stage, status, started_at) VALUES (?, ?, ?, ?)",
+            (dog_id, s, "active" if s == 1 else "locked", today if s == 1 else None),
+        )
+    await db.commit()
+
+
+async def get_truffle_stages(db: aiosqlite.Connection, dog_id: int) -> dict[int, str]:
+    """stage → status (locked|active|done). Пусто, если ещё не инициализировано."""
+    cur = await db.execute(
+        "SELECT stage, status FROM truffle_stage WHERE dog_id = ? ORDER BY stage", (dog_id,)
+    )
+    return {r["stage"]: r["status"] for r in await cur.fetchall()}
+
+
+async def complete_truffle_stage(
+    db: aiosqlite.Connection, dog_id: int, stage: int, day: dt.date
+) -> None:
+    """Закрывает этап и активирует следующий (если он был locked)."""
+    await db.execute(
+        "UPDATE truffle_stage SET status='done', completed_at=? WHERE dog_id=? AND stage=?",
+        (day.isoformat(), dog_id, stage),
+    )
+    await db.execute(
+        """UPDATE truffle_stage SET status='active', started_at=COALESCE(started_at, ?)
+           WHERE dog_id=? AND stage=? AND status='locked'""",
+        (day.isoformat(), dog_id, stage + 1),
+    )
+    await db.commit()
+
+
+# ── M5: Прогресс по командам послушания (Sprint 4) ─────────────
+async def ensure_commands(db: aiosqlite.Connection, dog_id: int, codes: list[str]) -> None:
+    for c in codes:
+        await db.execute(
+            "INSERT OR IGNORE INTO command_progress (dog_id, cmd, mastery, sessions) "
+            "VALUES (?, ?, 0, 0)",
+            (dog_id, c),
+        )
+    await db.commit()
+
+
+async def get_command_progress(
+    db: aiosqlite.Connection, dog_id: int
+) -> dict[str, aiosqlite.Row]:
+    cur = await db.execute(
+        "SELECT cmd, mastery, sessions FROM command_progress WHERE dog_id = ?", (dog_id,)
+    )
+    return {r["cmd"]: r for r in await cur.fetchall()}
+
+
+async def bump_command_session(
+    db: aiosqlite.Connection, dog_id: int, cmd: str, day: dt.date
+) -> None:
+    await db.execute(
+        "UPDATE command_progress SET sessions = sessions + 1, updated_at = ? "
+        "WHERE dog_id = ? AND cmd = ?",
+        (day.isoformat(), dog_id, cmd),
+    )
+    await db.commit()
+
+
+async def set_command_mastery(
+    db: aiosqlite.Connection, dog_id: int, cmd: str, level: int, day: dt.date
+) -> None:
+    await db.execute(
+        "UPDATE command_progress SET mastery = ?, updated_at = ? WHERE dog_id = ? AND cmd = ?",
+        (level, day.isoformat(), dog_id, cmd),
+    )
+    await db.commit()
