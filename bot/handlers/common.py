@@ -6,7 +6,7 @@ import datetime as dt
 from aiogram import Bot, Router
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import FSInputFile, Message
 
 from .. import db, gamification, reports, texts
 from ..config import Settings
@@ -61,6 +61,23 @@ async def cmd_profile(message: Message, settings: Settings) -> None:
 async def cmd_ping(message: Message, push: PushService) -> None:
     """Принудительно отправить тестовый пуш (минуя тихие часы)."""
     await push.send("test", force=True)
+
+
+@router.message(Command("backup"))
+async def cmd_backup(message: Message, push: PushService, bot: Bot) -> None:
+    """Сделать бэкап БД сейчас и прислать файл сюда (офсайт-копия по запросу)."""
+    await message.answer("🗄 Делаю бэкап БД…")
+    try:
+        path = await push.make_backup()
+    except Exception as e:  # noqa: BLE001 — показываем причину, не падаем
+        await message.answer(f"⚠️ Не удалось сделать бэкап: {e}")
+        return
+    size_kb = path.stat().st_size / 1024
+    await bot.send_document(
+        message.chat.id,
+        FSInputFile(str(path)),
+        caption=f"🗄 Бэкап БД — {path.name} ({size_kb:.0f} КБ)",
+    )
 
 
 @router.message(Command("today"))

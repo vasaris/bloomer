@@ -73,6 +73,12 @@ class Settings:
     latitude: float
     longitude: float
 
+    # Бэкапы БД (Sprint 8). backup_time=None → ежедневный бэкап отключён.
+    backup_time: tuple[int, int] | None
+    backup_keep: int
+    backup_dir: str | None
+    backup_to_telegram: bool
+
     anthropic_api_key: str | None
     claude_model: str
 
@@ -105,6 +111,9 @@ def load_settings() -> Settings:
             continue  # пуш отключён
         pushes[code] = _parse_hm(raw)
 
+    raw_backup = os.getenv("BACKUP_TIME", "03:30")
+    backup_time = None if raw_backup.strip().lower() in _OFF else _parse_hm(raw_backup)
+
     return Settings(
         bot_token=token,
         owner_chat_ids=_parse_ids(os.getenv("OWNER_CHAT_IDS")),
@@ -117,6 +126,10 @@ def load_settings() -> Settings:
         quiet_end=_parse_hm(os.getenv("QUIET_HOURS_END", "07:00")),
         latitude=float(os.getenv("LATITUDE", "45.2671")),    # Нови-Сад
         longitude=float(os.getenv("LONGITUDE", "19.8335")),
+        backup_time=backup_time,
+        backup_keep=int(os.getenv("BACKUP_KEEP", "7")),
+        backup_dir=(os.getenv("BACKUP_DIR") or None),
+        backup_to_telegram=os.getenv("BACKUP_TO_TELEGRAM", "on").strip().lower() not in _OFF,
         anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
         claude_model=os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6"),
     )

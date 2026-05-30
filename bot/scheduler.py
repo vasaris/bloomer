@@ -11,13 +11,15 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import pathlib
 
 import pytz
 from aiogram import Bot
+from aiogram.types import FSInputFile
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from . import db, reports
+from . import backup, db, reports
 from .config import Settings
 
 log = logging.getLogger(__name__)
@@ -72,6 +74,36 @@ class PushService:
         )
         log.info("Пуш '%s' отложен до %s", code, run_at.strftime("%H:%M"))
 
+    # ── Бэкапы БД (Sprint 8) ───────────────────────────────────
+    async def _send_doc_to_all(
+        self, path: pathlib.Path, caption: str, *, silent: bool = False
+    ) -> None:
+        doc = FSInputFile(str(path))
+        for chat_id in await self._recipients():
+            try:
+                await self.bot.send_document(
+                    chat_id, doc, caption=caption, disable_notification=silent
+                )
+            except Exception as e:  # сеть/блокировка — не роняем планировщик
+                log.warning("Не доставлен бэкап в %s: %s", chat_id, e)
+
+    async def make_backup(self) -> pathlib.Path:
+        """Делает бэкап БД на диск (Volume), без отправки. Возвращает путь к файлу."""
+        bdir = backup.backup_dir_for(self.settings.db_path, self.settings.backup_dir)
+        return await backup.make_backup(
+            self.settings.db_path, bdir, keep=self.settings.backup_keep
+        )
+
+    async def run_backup(self, *, broadcast: bool) -> pathlib.Path:
+        """Бэкап + (опц.) офсайт-копия в Telegram. Цель ежедневного джоба."""
+        path = await self.make_backup()
+        if broadcast and self.settings.backup_to_telegram:
+            # Тихо (disable_notification): джоб ходит ночью, будить не нужно.
+            await self._send_doc_to_all(
+                path, f"🗄 Авто-бэкап БД — {path.name}", silent=True
+            )
+        return path
+
 
 _scheduler: AsyncIOScheduler | None = None
 
@@ -107,5 +139,21 @@ def build_scheduler(bot: Bot, settings: Settings) -> tuple[AsyncIOScheduler, Pus
         replace_existing=True,
     )
     log.info("Зарегистрирован недельный обзор: %s %02d:%02d", settings.weekly_review_dow, wh, wm)
+
+    # Ежедневный бэкап БД (Sprint 8). Не зависит от тихих часов и приезда —
+    # это обслуживание. broadcast=True шлёт офсайт-копию в Telegram (тихо).
+    if settings.backup_time is not None:
+        bh, bm = settings.backup_time
+        scheduler.add_job(
+            svc.run_backup,
+            CronTrigger(hour=bh, minute=bm, timezone=settings.timezone),
+            kwargs={"broadcast": True},
+            id="daily:backup",
+            replace_existing=True,
+        )
+        log.info(
+            "Зарегистрирован бэкап БД на %02d:%02d (хранить %d, офсайт в TG: %s)",
+            bh, bm, settings.backup_keep, "да" if settings.backup_to_telegram else "нет",
+        )
 
     return scheduler, svc
