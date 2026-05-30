@@ -20,7 +20,7 @@ START = (
     "/arrived ГГГГ-ММ-ДД. От неё считается гид адаптации (3-3-3).\n\n"
     "💬 Можешь просто писать мне вопросы про уход (или /ask …) — отвечу с учётом "
     "состояния Блумера.\n\n"
-    "Команды: /today · /weekly · /adaptation · /train · /nose · /truffle · /groom · /health · /weight · /social · /trip · /weather · /asthma · /ask · /log · /stats · /export · /help"
+    "Команды: /today · /weekly · /adaptation · /train · /nose · /truffle · /groom · /health · /weight · /social · /trip · /weather · /asthma · /ask · /log · /stats · /export · /settings · /help"
 )
 
 HELP = (
@@ -43,6 +43,7 @@ HELP = (
     "• /stats — прогресс: уровень, XP, стрики, ачивки, заморозки\n"
     "• /weekly — недельный обзор (прогресс, стрики, что подтянуть)\n"
     "• /export — выгрузить журнал (zip: CSV + JSON)\n"
+    "• /settings — время пушей и тихих часов (изменить: /settime, /setquiet, /setweekly)\n"
     "• /profile — карточка собаки · /ping — тест-пуш\n"
     "• /backup — сделать бэкап БД сейчас и прислать файл сюда\n\n"
     "Пуши: бриф (с проверкой жары и идеей социализации), прогулки и кормёжка, "

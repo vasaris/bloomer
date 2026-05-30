@@ -160,3 +160,12 @@ CREATE TABLE IF NOT EXISTS trip_checklist (
     updated_at TEXT,
     UNIQUE(dog_id, item)
 );
+
+-- ── Настройки рантайма (Sprint 8): kv-override поверх .env ──
+-- Ключи: push.<code>='HH:MM'|'off', quiet.start, quiet.end, weekly.time, weekly.dow.
+-- Источник правды для пользовательских правок времени пушей из бота.
+CREATE TABLE IF NOT EXISTS setting (
+    key        TEXT PRIMARY KEY,
+    value      TEXT,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

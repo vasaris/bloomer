@@ -18,6 +18,7 @@ from .config import load_settings
 from .handlers import build_root_router
 from .middlewares import AccessMiddleware
 from .scheduler import build_scheduler
+from . import pushconf
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,8 +35,11 @@ async def main() -> None:
     conn = await db.connect(settings.db_path)
     try:
         await db.ensure_dog(conn, name=texts.DOG_NAME, breed="Лаготто-романьоло")
+        # Sprint 8: пользовательские правки времени пушей поверх .env.
+        overrides = await pushconf.load_overrides(conn)
     finally:
         await conn.close()
+    settings = pushconf.apply_overrides(settings, overrides)
 
     # 2. Бот и диспетчер.
     bot = Bot(

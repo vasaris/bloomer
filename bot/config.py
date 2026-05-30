@@ -29,6 +29,9 @@ _DEFAULT_PUSHES: dict[str, str] = {
 }
 _DEFAULT_WEEKLY = ("sun", "20:00")
 
+# Публичный алиас для pushconf/handlers (канонический список и порядок пушей).
+DEFAULT_PUSHES = _DEFAULT_PUSHES
+
 _PUSH_ENV = {
     "morning_brief": "PUSH_MORNING_BRIEF",
     "walk_morning": "PUSH_WALK_MORNING",

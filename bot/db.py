@@ -646,3 +646,26 @@ async def all_asthma(db: aiosqlite.Connection) -> list[aiosqlite.Row]:
         "SELECT id, date, status, note FROM asthma_check ORDER BY date, id"
     )
     return list(await cur.fetchall())
+
+
+# ── Sprint 8: настройки рантайма (kv-override поверх .env) ─────
+async def get_setting(db: aiosqlite.Connection, key: str) -> str | None:
+    cur = await db.execute("SELECT value FROM setting WHERE key = ?", (key,))
+    row = await cur.fetchone()
+    return row["value"] if row else None
+
+
+async def set_setting(db: aiosqlite.Connection, key: str, value: str) -> None:
+    await db.execute(
+        """INSERT INTO setting (key, value, updated_at)
+           VALUES (?, ?, datetime('now'))
+           ON CONFLICT(key) DO UPDATE SET value = excluded.value,
+                                          updated_at = excluded.updated_at""",
+        (key, value),
+    )
+    await db.commit()
+
+
+async def all_settings(db: aiosqlite.Connection) -> dict[str, str]:
+    cur = await db.execute("SELECT key, value FROM setting")
+    return {r["key"]: r["value"] for r in await cur.fetchall()}

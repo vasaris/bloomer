@@ -9,6 +9,7 @@
 """
 from __future__ import annotations
 
+import dataclasses
 import datetime as dt
 import logging
 import pathlib
@@ -73,6 +74,49 @@ class PushService:
             id=f"snooze:{code}:{run_at.timestamp()}",
         )
         log.info("Пуш '%s' отложен до %s", code, run_at.strftime("%H:%M"))
+
+    # ── Живые правки расписания из бота (Sprint 8) ─────────────
+    def set_push_time(self, code: str, hour: int, minute: int) -> None:
+        """Перепланировать (или включить) пуш на новое время; обновить settings."""
+        if code == "weekly_review":
+            self.set_weekly(self.settings.weekly_review_dow, hour, minute)
+            return
+        _scheduler.add_job(
+            self.send,
+            CronTrigger(hour=hour, minute=minute, timezone=self.settings.timezone),
+            args=[code], id=f"daily:{code}", replace_existing=True,
+        )
+        pushes = dict(self.settings.pushes)
+        pushes[code] = (hour, minute)
+        self.settings = dataclasses.replace(self.settings, pushes=pushes)
+        log.info("Пуш '%s' перепланирован на %02d:%02d", code, hour, minute)
+
+    def disable_push(self, code: str) -> None:
+        """Снять пуш с расписания."""
+        job_id = "weekly:review" if code == "weekly_review" else f"daily:{code}"
+        if _scheduler.get_job(job_id):
+            _scheduler.remove_job(job_id)
+        if code != "weekly_review":
+            pushes = dict(self.settings.pushes)
+            pushes.pop(code, None)
+            self.settings = dataclasses.replace(self.settings, pushes=pushes)
+        log.info("Пуш '%s' отключён", code)
+
+    def set_weekly(self, dow: str, hour: int, minute: int) -> None:
+        _scheduler.add_job(
+            self.send,
+            CronTrigger(day_of_week=dow, hour=hour, minute=minute, timezone=self.settings.timezone),
+            args=["weekly_review"], id="weekly:review", replace_existing=True,
+        )
+        self.settings = dataclasses.replace(
+            self.settings, weekly_review_dow=dow, weekly_review_time=(hour, minute)
+        )
+        log.info("Недельный обзор перепланирован на %s %02d:%02d", dow, hour, minute)
+
+    def set_quiet(self, start: tuple[int, int], end: tuple[int, int]) -> None:
+        """Тихие часы проверяются в send() по self.settings — просто обновляем их."""
+        self.settings = dataclasses.replace(self.settings, quiet_start=start, quiet_end=end)
+        log.info("Тихие часы обновлены: %02d:%02d–%02d:%02d", *start, *end)
 
     # ── Бэкапы БД (Sprint 8) ───────────────────────────────────
     async def _send_doc_to_all(

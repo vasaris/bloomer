@@ -9,12 +9,13 @@ from ..modules import (
     m6_socialization,
     m7_travel,
 )
-from . import ask, asthma, common, export, logging
+from . import ask, asthma, common, export, logging, settings
 
 
 def build_root_router() -> Router:
     root = Router()
     root.include_router(common.router)
+    root.include_router(settings.router)
     root.include_router(m0_adaptation.router)
     root.include_router(m3_grooming.router)
     root.include_router(m4_health.router)
