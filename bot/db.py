@@ -550,3 +550,99 @@ async def toggle_trip_item(
 async def reset_trip_checklist(db: aiosqlite.Connection, dog_id: int) -> None:
     await db.execute("UPDATE trip_checklist SET checked = 0 WHERE dog_id = ?", (dog_id,))
     await db.commit()
+
+
+# ── Sprint 8: агрегаты за период (недельный обзор) ─────────────
+async def count_by_type_range(
+    db: aiosqlite.Connection, dog_id: int, start: dt.date, end: dt.date
+) -> dict[str, int]:
+    """Кол-во событий каждого type за окно [start, end] включительно: type → n."""
+    cur = await db.execute(
+        """SELECT type, COUNT(*) AS n FROM event_log
+           WHERE dog_id = ? AND local_date >= ? AND local_date <= ?
+           GROUP BY type""",
+        (dog_id, start.isoformat(), end.isoformat()),
+    )
+    return {r["type"]: r["n"] for r in await cur.fetchall()}
+
+
+async def daily_event_counts(
+    db: aiosqlite.Connection, dog_id: int, type_: str, start: dt.date, end: dt.date
+) -> dict[str, int]:
+    """Событий данного типа по дням окна: 'YYYY-MM-DD' → n (только дни с событиями)."""
+    cur = await db.execute(
+        """SELECT local_date, COUNT(*) AS n FROM event_log
+           WHERE dog_id = ? AND type = ? AND local_date >= ? AND local_date <= ?
+           GROUP BY local_date""",
+        (dog_id, type_, start.isoformat(), end.isoformat()),
+    )
+    return {r["local_date"]: r["n"] for r in await cur.fetchall()}
+
+
+async def achievements_since(
+    db: aiosqlite.Connection, dog_id: int, since: dt.date
+) -> list[str]:
+    """Коды ачивок, открытых начиная с даты since (по unlocked_at)."""
+    cur = await db.execute(
+        """SELECT code FROM achievement
+           WHERE dog_id = ? AND user_id IS NULL AND unlocked_at >= ?
+           ORDER BY unlocked_at""",
+        (dog_id, f"{since.isoformat()} 00:00:00"),
+    )
+    return [r["code"] for r in await cur.fetchall()]
+
+
+# ── Sprint 8: стрики целиком (видимость заморозок) ─────────────
+async def get_streak_row(
+    db: aiosqlite.Connection, dog_id: int, kind: str
+) -> aiosqlite.Row | None:
+    cur = await db.execute(
+        "SELECT current, best, last_day, freezes_left FROM streak "
+        "WHERE dog_id = ? AND kind = ?",
+        (dog_id, kind),
+    )
+    return await cur.fetchone()
+
+
+async def get_streaks_summary(
+    db: aiosqlite.Connection, dog_id: int, kinds: list[str]
+) -> dict[str, dict]:
+    """kind → {current, best, freezes_left}. Отсутствующие стрики — нули."""
+    out: dict[str, dict] = {}
+    for k in kinds:
+        row = await get_streak_row(db, dog_id, k)
+        out[k] = {
+            "current": row["current"] if row else 0,
+            "best": row["best"] if row else 0,
+            "freezes_left": row["freezes_left"] if row else 2,
+        }
+    return out
+
+
+# ── Sprint 8: выгрузка журнала (экспорт) ──────────────────────
+async def all_events(db: aiosqlite.Connection, dog_id: int) -> list[aiosqlite.Row]:
+    cur = await db.execute(
+        """SELECT e.id, e.local_date, e.created_at, e.module, e.type,
+                  e.payload_json, u.name AS user_name
+           FROM event_log e LEFT JOIN app_user u ON u.id = e.user_id
+           WHERE e.dog_id = ?
+           ORDER BY e.local_date, e.id""",
+        (dog_id,),
+    )
+    return list(await cur.fetchall())
+
+
+async def all_health_metrics(db: aiosqlite.Connection, dog_id: int) -> list[aiosqlite.Row]:
+    cur = await db.execute(
+        "SELECT id, metric, value, unit, measured_at FROM health_metric "
+        "WHERE dog_id = ? ORDER BY measured_at, id",
+        (dog_id,),
+    )
+    return list(await cur.fetchall())
+
+
+async def all_asthma(db: aiosqlite.Connection) -> list[aiosqlite.Row]:
+    cur = await db.execute(
+        "SELECT id, date, status, note FROM asthma_check ORDER BY date, id"
+    )
+    return list(await cur.fetchall())

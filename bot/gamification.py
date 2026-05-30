@@ -117,19 +117,30 @@ async def on_event(
     # 1. XP + возможный ап уровня.
     msgs += await award_xp(conn, dog_id, XP_PER_EVENT.get(type_, 0))
 
-    # 2. Стрики + ачивки порогов.
+    # 2. Стрики + ачивки порогов. Заодно ловим расход заморозки (стрик спасён).
+    async def _streak_with_freeze_note(kind: str) -> int:
+        before = await db.get_streak_row(conn, dog_id, kind)
+        fz_before = before["freezes_left"] if before else None
+        cur = await db.register_streak_day(conn, dog_id, kind, today)
+        after = await db.get_streak_row(conn, dog_id, kind)
+        if fz_before is not None and after is not None and after["freezes_left"] < fz_before:
+            msgs.append(
+                texts.BLOOMER_VOICE["streak_freeze"].format(left=after["freezes_left"])
+            )
+        return cur
+
     if type_ == "walk":
         walks_today = await db.count_events_today(conn, dog_id, "walk", today)
         if walks_today == WALKS_PER_DAY:  # ровно при достижении нормы дня
-            cur = await db.register_streak_day(conn, dog_id, "walk", today)
+            cur = await _streak_with_freeze_note("walk")
             if cur in WALK_STREAK_ACH:
                 await _maybe_unlock(conn, dog_id, WALK_STREAK_ACH[cur], msgs)
     elif type_ == "nose":
-        cur = await db.register_streak_day(conn, dog_id, "nose", today)
+        cur = await _streak_with_freeze_note("nose")
         if cur in NOSE_STREAK_ACH:
             await _maybe_unlock(conn, dog_id, NOSE_STREAK_ACH[cur], msgs)
     elif type_ == "command":
-        cur = await db.register_streak_day(conn, dog_id, "command", today)
+        cur = await _streak_with_freeze_note("command")
         if cur in COMMAND_STREAK_ACH:
             await _maybe_unlock(conn, dog_id, COMMAND_STREAK_ACH[cur], msgs)
 

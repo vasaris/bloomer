@@ -89,6 +89,20 @@ async def cmd_today(message: Message, settings: Settings) -> None:
         await message.answer(text, reply_markup=markup)
 
 
+@router.message(Command("weekly"))
+async def cmd_weekly(message: Message, settings: Settings) -> None:
+    """Недельный обзор по запросу (тот же, что и пуш вс 20:00)."""
+    built = await reports.build_push("weekly_review", settings)
+    if built is None:
+        await message.answer(
+            "🗓 Недельный обзор будет доступен после приезда Блумера — "
+            "отметь дату через /arrived."
+        )
+        return
+    text, markup = built
+    await message.answer(text, reply_markup=markup)
+
+
 @router.message(Command("walks"))
 async def cmd_walks(message: Message, settings: Settings) -> None:
     """Разбивка прогулок за последние 7 дней по местам."""
@@ -117,16 +131,20 @@ async def cmd_stats(message: Message, settings: Settings) -> None:
     try:
         dog = await db.get_dog(conn)
         xp = await db.get_xp(conn, dog["id"])
-        walk = await db.get_streak(conn, dog["id"], "walk")
-        nose = await db.get_streak(conn, dog["id"], "nose")
-        cmd = await db.get_streak(conn, dog["id"], "command")
+        st = await db.get_streaks_summary(conn, dog["id"], ["walk", "nose", "command"])
         ach = await db.list_achievements(conn, dog["id"])
     finally:
         await conn.close()
 
     text = texts.STATS.format(
         dog=dog["name"], level=gamification.level_for(xp), xp=xp,
-        walk=walk, nose=nose, cmd=cmd, ach_count=len(ach),
+        walk=st["walk"]["current"], nose=st["nose"]["current"], cmd=st["command"]["current"],
+        ach_count=len(ach),
+    )
+    text += (
+        f"\n🧊 Заморозки: 🚶 {st['walk']['freezes_left']} · "
+        f"👃 {st['nose']['freezes_left']} · 🧠 {st['command']['freezes_left']} "
+        f"(пополняются до 2 каждый месяц)"
     )
     if ach:
         text += "\n" + "\n".join("• " + gamification.ach_title(c) for c in ach)

@@ -9,7 +9,7 @@ from ..modules import (
     m6_socialization,
     m7_travel,
 )
-from . import ask, asthma, common, logging
+from . import ask, asthma, common, export, logging
 
 
 def build_root_router() -> Router:
@@ -23,6 +23,7 @@ def build_root_router() -> Router:
     root.include_router(m7_travel.router)
     root.include_router(logging.router)
     root.include_router(asthma.router)
+    root.include_router(export.router)
     # ask — последним: свободный текст ловит всё, что не команда и не кнопка.
     root.include_router(ask.router)
     return root
